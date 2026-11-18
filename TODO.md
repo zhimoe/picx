@@ -21,9 +21,17 @@
 
 当前阻塞：
 
-- 本机代理 `127.0.0.1:7890` 间歇性返回 503，GitHub API 目前不可达
+- 本机代理 `127.0.0.1:7890`（进程 `MacPacket`，PID 2259）对所有站点返回
+  `CONNECT ... 503`，不只是 GitHub；`api.github.com` 和 `google.com` 都无法访问
 - Wrangler 未登录（之前保存的 OAuth token 已过期，无法非交互刷新）
 - 因此“真实 GitHub 上传”和“部署到 Cloudflare”尚未完成
+
+需要先处理：
+
+1. 重启代理应用 / 切换节点 / 检查订阅是否过期，或暂时关闭代理并确认能否直连
+2. 验证：`curl -sS -o /dev/null -w '%{http_code}\n' https://api.github.com/zen`
+   返回 `200`
+3. 网络恢复后让 Claude 继续，或按下面第 2、3 节手动完成
 
 ## 需要你操作的部分
 
