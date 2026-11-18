@@ -1,11 +1,12 @@
 # PicX Mini — 待办与恢复清单
 
-## 当前状态（2026-11-18）
+## 当前状态（2026-11-18 19:20）
 
 已完成并验证：
 
 - 代码完成：SolidJS + TypeScript + Vite 8（内置 Rolldown），唯一运行时依赖 `solid-js`
-- `npm run check` 通过：类型检查、15 个测试、生产构建
+- `npm run check` 通过：类型检查、16 个测试、生产构建
+- 代码仓库已创建并推送：https://github.com/zhimoe/picx-mini（public，`main`）
 - Worker 本地实测（`npm run worker:dev`，http://localhost:8787）：
   - 无密码 → 401，错误用户名/密码 → 401，正确密码 → 200
   - `WWW-Authenticate`、`X-Content-Type-Options`、`Referrer-Policy`、
@@ -16,22 +17,23 @@
   - 设置页空值校验提示正确
   - 保存配置后顶部仓库信息更新；清除配置有确认框且 localStorage 被清空
   - 移动端 390×844 布局正常，无横向溢出
-- WebP 转换实测：450.9 KB PNG → 7.7 KB WebP，1200×800，质量 0.82
-- 上传失败路径实测：断网时显示“无法连接 GitHub API：Failed to fetch”，不崩溃
+- 真实 GitHub 上传验证通过（图片仓库 `zhimoe/picx-images-hosting` @ `master`）：
+  - 中文名 PNG 2.5 MB → 195.9 KB WebP，1200×800，质量 0.82
+  - 写入 `pic/测试-图片.webp`，jsDelivr 返回 200（200568 字节）
+  - 同目录重名自动变为 `测试-图片-2.webp`
+  - GIF/SVG 原样上传，界面显示“GIF 保持原格式，避免丢失动画”
+    “SVG 保持原格式，保留矢量”
+  - 图库缩略图加载、搜索、单条/批量复制 Markdown 正常
+  - 验证完成后测试文件已删除（commit `c468f754`），图库恢复为 29 张
+- 并发上传修复并实测：同一批 3 张图会触发 GitHub Contents API `409 Conflict`
+  （分支 ref 竞争）。现在遇到可重试的 409 会退避重试（200/400/800/1600 ms），
+  实测连续 2 次 409 后全部成功；空仓库的 409 不重试并提示明确原因。
+- 断网失败路径、WebP 转换（450.9 KB PNG → 7.7 KB WebP）等本地实测通过
 
-当前阻塞：
+剩余阻塞：
 
-- 本机代理 `127.0.0.1:7890`（进程 `MacPacket`，PID 2259）对所有站点返回
-  `CONNECT ... 503`，不只是 GitHub；`api.github.com` 和 `google.com` 都无法访问
 - Wrangler 未登录（之前保存的 OAuth token 已过期，无法非交互刷新）
-- 因此“真实 GitHub 上传”和“部署到 Cloudflare”尚未完成
-
-需要先处理：
-
-1. 重启代理应用 / 切换节点 / 检查订阅是否过期，或暂时关闭代理并确认能否直连
-2. 验证：`curl -sS -o /dev/null -w '%{http_code}\n' https://api.github.com/zen`
-   返回 `200`
-3. 网络恢复后让 Claude 继续，或按下面第 2、3 节手动完成
+- 因此尚未部署到 Cloudflare，线上验证清单还未执行
 
 ## 需要你操作的部分
 
@@ -50,56 +52,22 @@
 
 - `wrangler login` 会打开浏览器，登录你的 Cloudflare 账号并授权。
 - `BASIC_USER` / `BASIC_PASS` 是打开网页时的登录框，和 GitHub Token 无关。
-- 如果你更习惯自己部署，运行 `npm run deploy` 即可；部署完把 `*.workers.dev`
-  地址发给我，我来做线上验证。
-- 如果你运行完 `wrangler login` 和两个 secret，直接告诉我“已登录”，我来执行
-  `npm run deploy` 并验证。
+- 运行完 `wrangler login` 和两个 secret 后，直接告诉 Claude“已登录”，
+  由 Claude 执行 `npm run deploy` 并做线上验证。
+- 也可以自己运行 `npm run deploy`，把 `*.workers.dev` 地址发过来。
+- 图片仓库的默认分支是 `master`，设置页的分支要填 `master`，不是 `main`。
 
-### 2. 网络恢复后：真实 GitHub 上传验证
+### 2. 测试图片
 
-如果 Claude 会话还在，直接说“网络好了 / 继续”，我会用你的 GitHub 账号完成：
-
-- 在 `zhimoe/picx-images-hosting` 上传一张测试图片（会产生一次真实 commit）
-- 验证 WebP 文件名、转换前后大小
-- 验证 `https://cdn.jsdelivr.net/gh/zhimoe/picx-images-hosting@main/...` 可访问
-- 验证 Markdown 复制、图库列表、搜索、批量复制
-- 验证同目录重名自动加 `-2`
-- 验证 GIF/SVG 原样上传并标注“未转换”
-
-如果你想自己先验证：
-
-1. `npm run dev`，打开 http://localhost:5173
-2. 设置页填写：Token、`zhimoe`、`picx-images-hosting`、`main`，点“测试连接”
-3. 上传一张 JPG/PNG，检查结果
-4. 注意：Token 只填在设置页，**不要发到聊天或提交到仓库**
-
-### 3. 代码仓库（后台任务会尝试自动完成）
-
-已选择公开仓库 `zhimoe/picx-mini`。后台任务会在网络恢复后自动创建并推送。
-如果结束时仓库仍未创建，手动执行：
-
-```bash
-cd ~/code/picx-mini
-gh repo create picx-mini --public --source=. --remote=origin --push
-```
-
-如果已在网页手动建好空仓库：
-
-```bash
-git remote add origin https://github.com/zhimoe/picx-mini.git
-git push -u origin main
-```
-
-推送前确认 `.dev.vars`、Token、`node_modules`、`dist`、`.wrangler` 没有被提交
-（`.gitignore` 已覆盖）。
+已按你的选择清理完毕，无需操作。
 
 ## 部署后的线上验证清单
 
 - [ ] 打开 `https://picx-mini.<你的子域>.workers.dev`
 - [ ] 不输入密码 → 401；正确密码 → 200；错误密码 → 401
 - [ ] 手机或其他浏览器能登录
-- [ ] 设置页填写 GitHub Token / owner / repo / branch / 上传目录
-- [ ] 点“测试连接”成功，私有仓库提示正确
+- [ ] 设置页填写 GitHub Token / `zhimoe` / `picx-images-hosting` / `master` / `pic`
+- [ ] 点“测试连接”成功，仓库信息正确
 - [ ] 上传一张图片，生成 `.webp`、jsDelivr 链接、Markdown
 - [ ] 浏览器打开生成的 jsDelivr 链接（新文件可能延迟，用“刷新 CDN”）
 - [ ] 图库能列出仓库中已有图片，搜索/批量复制正常
@@ -109,7 +77,7 @@ git push -u origin main
 
 - `.dev.vars` 已创建，内含随机测试密码，仅用于本地 `npm run worker:dev`，
   已被 `.gitignore` 忽略。可自行修改或删除。
-- 测试图片和截图在 `/tmp`，不在项目里。
+- 本次真实上传验证的临时图片在 `/tmp/picx-mini-test/`，可随时删除。
 - 项目内没有提交任何 Token 或密码。
 
 ## 已知限制
@@ -123,6 +91,7 @@ git push -u origin main
 - Git LFS 文件不会被 jsDelivr 直接提供
 - 国内网络需要浏览器能访问 `api.github.com` 和 `cdn.jsdelivr.net`；
   `*.workers.dev` 可能不稳定，可绑定自定义域名
+- 同批次并发上传遇到 409 会自动重试；重试仍失败时界面会提示“请重试”
 
 ## 快速命令
 
@@ -151,4 +120,4 @@ npm run check
 curl -sS -o /dev/null -w '%{http_code}\n' https://api.github.com/zen
 ```
 
-网络返回 `200` 后，直接让 Claude 继续完成真实上传验证和部署。
+网络返回 `200` 后，直接让 Claude 继续完成 Cloudflare 部署和线上验证。

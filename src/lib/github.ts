@@ -247,6 +247,19 @@ export function isDuplicateError(error: unknown): boolean {
   )
 }
 
+/**
+ * Concurrent Contents API writes can lose a race on the branch ref and return
+ * 409 Conflict. Retrying after a short backoff succeeds once the other upload
+ * commits. An empty repository also returns 409, but retrying cannot help.
+ */
+export function isConflictError(error: unknown): boolean {
+  return (
+    error instanceof GitHubError &&
+    error.status === 409 &&
+    !/empty/i.test(error.message)
+  )
+}
+
 export async function purgeJsdelivr(
   owner: string,
   repo: string,
@@ -281,7 +294,9 @@ export function describeGitHubError(error: unknown): string {
       case 404:
         return '仓库或分支不存在，或 Token 无权访问。'
       case 409:
-        return '仓库为空或存在冲突，请先在 GitHub 创建首次提交。'
+        return /empty/i.test(error.message)
+          ? '仓库为空或分支不存在，请先在 GitHub 创建首次提交。'
+          : '上传时分支被其他操作更新，请重试。'
       case 422:
         return `GitHub 拒绝了请求：${error.message}`
       default:

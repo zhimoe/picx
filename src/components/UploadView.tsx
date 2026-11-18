@@ -10,6 +10,7 @@ import type { Settings, UploadItem, UploadStatus } from '../types'
 import { copyText } from '../lib/copy'
 import {
   describeGitHubError,
+  isConflictError,
   isDuplicateError,
   purgeJsdelivr,
   putContent,
@@ -200,8 +201,9 @@ export default function UploadView(props: Props) {
       height: conversion.height,
     })
 
+    let name = uniqueName(baseName, ext, used)
+
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const name = uniqueName(baseName, ext, used)
       const path = joinPath(dir, name)
 
       try {
@@ -229,7 +231,17 @@ export default function UploadView(props: Props) {
         })
         return true
       } catch (error) {
-        if (isDuplicateError(error) && attempt < 4) continue
+        if (attempt < 4) {
+          if (isDuplicateError(error)) {
+            name = uniqueName(baseName, ext, used)
+            continue
+          }
+          if (isConflictError(error)) {
+            await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt))
+            continue
+          }
+        }
+
         updateItem(item.id, {
           status: 'error',
           error: describeGitHubError(error),
