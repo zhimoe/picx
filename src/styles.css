@@ -231,27 +231,10 @@ code {
 }
 
 .sidebar-foot {
-  display: grid;
-  gap: 8px;
   margin-top: auto;
   padding-top: 15px;
   border-top: 1px solid var(--border);
 }
-
-.workspace-status {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 8px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-}
-
-.workspace-status:hover { background: var(--surface-3); }
 
 .theme-picker { position: relative; min-width: 0; color: var(--muted); }
 
@@ -281,7 +264,7 @@ code {
 .theme-picker > svg:first-child { left: 10px; }
 .theme-picker > svg:last-child { right: 10px; }
 
-.workspace-icon, .section-icon, .empty-icon {
+.section-icon, .empty-icon {
   display: inline-grid;
   flex: 0 0 auto;
   place-items: center;
@@ -290,18 +273,7 @@ code {
   color: var(--accent);
 }
 
-.workspace-icon { width: 34px; height: 34px; }
-.workspace-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 650;
-}
-.workspace-label-mobile { display: none; }
-
-:root:not([data-theme="terracotta"]) :is(.workspace-icon, .section-icon, .empty-icon) {
+:root:not([data-theme="terracotta"]) :is(.section-icon, .empty-icon) {
   background: var(--surface-2);
   color: var(--muted);
 }
@@ -791,18 +763,12 @@ input[type="checkbox"] { width: 17px; height: 17px; margin: 2px 0 0; flex: 0 0 a
   .brand-text strong { font-size: 18px; }
   .brand-text span { margin-top: 1px; font-size: 10px; }
   .sidebar-foot {
-    display: flex;
     grid-column: 2;
     grid-row: 1;
-    align-items: center;
-    gap: 6px;
     margin: 0;
     padding: 0;
     border: 0;
   }
-  .workspace-status { width: auto; min-height: 36px; padding: 3px 6px; }
-  .workspace-icon { width: 29px; height: 29px; }
-  .workspace-text { max-width: 145px; }
   .theme-picker select { min-height: 36px; }
   .navigation { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
   .navigation button { justify-content: center; min-height: 37px; padding: 6px 4px; gap: 7px; font-size: 13px; }
@@ -818,12 +784,9 @@ input[type="checkbox"] { width: 17px; height: 17px; margin: 2px 0 0; flex: 0 0 a
 }
 
 @media (max-width: 640px) {
-  .workspace-status { gap: 4px; padding-inline: 3px; }
-  .workspace-text { display: none; }
   .theme-picker select { padding-inline: 27px 23px; font-size: 12px; }
   .theme-picker > svg:first-child { left: 7px; width: 15px; }
   .theme-picker > svg:last-child { right: 6px; width: 13px; }
-  .workspace-label-mobile { display: inline; font-size: 12px; font-weight: 650; }
   .settings-open { --settings-bar-space: calc(68px + env(safe-area-inset-bottom, 0px)); }
   .settings-open .main { padding-bottom: var(--settings-bar-space); }
   .settings-open .toasts { bottom: var(--settings-bar-space); }

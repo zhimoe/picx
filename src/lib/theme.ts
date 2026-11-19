@@ -1,4 +1,4 @@
-export const themes = ['light', 'dark', 'terracotta'] as const
+export const themes = ['terracotta', 'dark', 'light'] as const
 export type Theme = (typeof themes)[number]
 
 const STORAGE_KEY = 'picx:theme:v1'

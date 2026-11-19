@@ -23,9 +23,9 @@ const navigation: { tab: Tab; label: string; icon: IconName }[] = [
 ]
 
 const themeLabels: Record<Theme, string> = {
-  light: '新版浅色',
-  dark: '新版深色',
-  terracotta: '原陶土红',
+  terracotta: '陶土红',
+  dark: '商务深色',
+  light: '商务浅色',
 }
 
 const themeIcons: Record<Theme, string> = {
@@ -56,7 +56,6 @@ export default function App() {
 
   const [settings, setSettings] = createSignal(loadSettings())
   const configured = () => isConfigured(settings())
-  const repository = () => `${settings().owner}/${settings().repo}`
   const [tab, setTab] = createSignal<Tab>(configured() ? 'upload' : 'settings')
   const [galleryOpened, setGalleryOpened] = createSignal(false)
   const [galleryVersion, setGalleryVersion] = createSignal(0)
@@ -111,21 +110,6 @@ export default function App() {
         </nav>
 
         <div class="sidebar-foot">
-          <button
-            type="button"
-            class="workspace-status"
-            aria-label={configured() ? `仓库设置，当前仓库 ${repository()}` : '仓库设置，尚未配置'}
-            title={configured() ? repository() : '设置 GitHub Token'}
-            onClick={() => selectTab('settings')}
-          >
-            <span class="workspace-icon"><Icon name="repo" size={17} /></span>
-            <span class="workspace-text" aria-hidden="true">
-              {configured() ? settings().repo : '未配置仓库'}
-            </span>
-            <span class="workspace-label-mobile" aria-hidden="true">
-              {configured() ? '仓库' : '未配置'}
-            </span>
-          </button>
           <div class="theme-picker">
             <Icon name="appearance" size={17} />
             <select
