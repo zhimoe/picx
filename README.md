@@ -1,6 +1,6 @@
 # PicX
 
-一个轻量的 GitHub 图床：浏览器里拖入图片，自动转成 WebP，上传到你自己的
+🏞️ 一个轻量的 GitHub 图床：浏览器里拖入图片，自动转成 WebP，上传到你自己的
 GitHub 仓库，拿到 jsDelivr 链接和 Markdown。页面由 Cloudflare Worker 的
 Basic Auth 保护，不需要数据库，也不需要服务端保存 GitHub Token。
 
@@ -27,7 +27,7 @@ https://picx.zhi-moe.workers.dev
 - Node.js >= 22.12
 - 一个 **公开** 的 GitHub 仓库（jsDelivr 无法公开访问私有仓库）
 - GitHub Token（选择方式见下文）
-- 免费的 Cloudflare 账号
+- Cloudflare 账号 (使用免费额度的 worker 即可满足个人使用)
 
 ## 默认配置
 
@@ -52,7 +52,7 @@ npm install
 npm run dev
 ```
 
-打开 http://localhost:5173 。Vite 开发服务器没有密码，不要暴露到公网。
+打开 http://localhost:5173。Vite 开发服务器没有密码，不要暴露到公网。
 
 要测试真实的 Worker + Basic Auth：
 
@@ -62,7 +62,7 @@ cp .dev.vars.example .dev.vars
 npm run worker:dev
 ```
 
-打开 http://localhost:8787 ，用 `.dev.vars` 里的用户名/密码登录。
+打开 http://localhost:8787，用 `.dev.vars` 里的用户名/密码登录。
 
 常用命令：
 
