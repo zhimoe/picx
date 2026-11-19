@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test, type TestContext } from 'node:test'
-import { loadTheme, saveTheme, themes } from '../src/lib/theme.ts'
+import { loadTheme, resolveTheme, saveTheme, themes } from '../src/lib/theme.ts'
 
 function mockStorage(context: TestContext, descriptor: PropertyDescriptor) {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
@@ -32,6 +32,12 @@ test('remembers each of the three theme choices', (context) => {
 
   entries.set('picx:theme:v1', 'unknown')
   assert.equal(loadTheme(), undefined)
+})
+
+test('defaults to the terracotta theme', () => {
+  assert.equal(resolveTheme(undefined), 'terracotta')
+  assert.equal(resolveTheme('dark'), 'dark')
+  assert.equal(resolveTheme('light'), 'light')
 })
 
 test('handles browser storage being blocked', (context) => {

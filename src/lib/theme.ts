@@ -1,6 +1,12 @@
 export const themes = ['terracotta', 'dark', 'light'] as const
 export type Theme = (typeof themes)[number]
 
+export const DEFAULT_THEME: Theme = 'terracotta'
+
+export function resolveTheme(preferred: Theme | undefined): Theme {
+  return preferred ?? DEFAULT_THEME
+}
+
 const STORAGE_KEY = 'picx:theme:v1'
 
 export function isTheme(value: string | null): value is Theme {

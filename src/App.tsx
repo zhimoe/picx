@@ -1,4 +1,4 @@
-import { For, createEffect, createSignal, onCleanup } from 'solid-js'
+import { For, createEffect, createSignal } from 'solid-js'
 import type { Settings } from './types'
 import {
   DEFAULT_SETTINGS,
@@ -7,7 +7,7 @@ import {
   loadSettings,
   saveSettings,
 } from './lib/storage'
-import { isTheme, loadTheme, saveTheme, themes, type Theme } from './lib/theme'
+import { isTheme, loadTheme, resolveTheme, saveTheme, themes, type Theme } from './lib/theme'
 import GalleryView from './components/GalleryView'
 import Icon, { type IconName } from './components/Icon'
 import SettingsView from './components/SettingsView'
@@ -35,17 +35,10 @@ const themeIcons: Record<Theme, string> = {
 }
 
 export default function App() {
-  const systemScheme = window.matchMedia('(prefers-color-scheme: dark)')
-  const [systemDark, setSystemDark] = createSignal(systemScheme.matches)
   const [preferredTheme, setPreferredTheme] = createSignal(loadTheme())
-  const theme = () => preferredTheme() ?? (systemDark() ? 'dark' : 'light')
-  const followSystem = (event: MediaQueryListEvent) => setSystemDark(event.matches)
-  systemScheme.addEventListener('change', followSystem)
-  onCleanup(() => systemScheme.removeEventListener('change', followSystem))
+  const theme = () => resolveTheme(preferredTheme())
 
   createEffect(() => {
-    // The original terracotta theme keeps both of its system color schemes.
-    systemDark()
     const active = theme()
     const root = document.documentElement
     root.dataset.theme = active

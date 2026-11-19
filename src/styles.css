@@ -253,6 +253,7 @@ code {
 }
 
 .theme-picker select:hover { background: var(--surface-2); }
+.theme-picker select:focus-visible { outline: none; }
 
 .theme-picker > svg {
   position: absolute;
