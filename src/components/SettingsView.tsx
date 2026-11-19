@@ -121,8 +121,8 @@ export default function SettingsView(props: Props) {
             </button>
           </div>
           <small class="hint">
-            需要 classic Token 的 <code>repo</code> 权限，或 fine-grained Token 的
-            Contents 读写权限。
+            公开仓库用 classic Token 的 <code>public_repo</code> 即可，私有仓库才需要{' '}
+            <code>repo</code>。更推荐 fine-grained Token，只授权目标仓库的 Contents 读写。
             <a href="https://github.com/settings/tokens/new" target="_blank" rel="noreferrer">
               生成 Token
             </a>
@@ -135,7 +135,7 @@ export default function SettingsView(props: Props) {
             <input
               value={owner()}
               onInput={(event) => setOwner(event.currentTarget.value)}
-              placeholder="你的 GitHub 用户名或组织"
+              placeholder="zhimoe"
               autocomplete="off"
               spellcheck={false}
             />
@@ -146,7 +146,7 @@ export default function SettingsView(props: Props) {
             <input
               value={repo()}
               onInput={(event) => setRepo(event.currentTarget.value)}
-              placeholder="例如 blog-images"
+              placeholder="picx-images-hosting"
               autocomplete="off"
               spellcheck={false}
             />
@@ -157,7 +157,7 @@ export default function SettingsView(props: Props) {
             <input
               value={branch()}
               onInput={(event) => setBranch(event.currentTarget.value)}
-              placeholder="main"
+              placeholder="master"
               autocomplete="off"
               spellcheck={false}
             />
@@ -168,7 +168,7 @@ export default function SettingsView(props: Props) {
             <input
               value={dir()}
               onInput={(event) => setDir(event.currentTarget.value)}
-              placeholder="blog/{yyyy}/{mm} 或留空"
+              placeholder="pic"
               autocomplete="off"
               spellcheck={false}
             />
@@ -272,11 +272,12 @@ export default function SettingsView(props: Props) {
       </form>
 
       <p class="muted small">
-        PicX Mini 是 PicX v2 的极简替代实现，图片仍保存在你自己的 GitHub 仓库。
-        旧图片不会被修改；只要仓库、分支和路径不变，旧链接继续有效。
+        图片仍保存在你自己的 GitHub 仓库。旧图片不会被修改；只要仓库、分支和路径不变，旧链接继续有效。
       </p>
       <p class="muted small">
-        当前默认值：{DEFAULT_SETTINGS.branch} 分支、质量 {DEFAULT_SETTINGS.quality}。
+        当前默认值：{DEFAULT_SETTINGS.owner}/{DEFAULT_SETTINGS.repo} @{' '}
+        {DEFAULT_SETTINGS.branch} · 目录 <code>{DEFAULT_SETTINGS.dir || '/'}</code> · 质量{' '}
+        {DEFAULT_SETTINGS.quality}。
       </p>
     </section>
   )

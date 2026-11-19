@@ -91,25 +91,54 @@ async function ghFetch<T>(
 
   if (init.body !== undefined) headers['Content-Type'] = 'application/json'
 
+  const timeout = init.method === 'PUT' ? PUT_TIMEOUT : GET_TIMEOUT
+  const controller =
+    typeof AbortController !== 'undefined' ? new AbortController() : undefined
+  let didTimeout = false
+  let rejectTimeout: ((error: GitHubError) => void) | undefined
+
+  // AbortSignal alone is not enough: a stalled proxy or response body can leave
+  // fetch pending. This race guarantees the UI leaves its loading state.
+  const timedOut = new Promise<never>((_, reject) => {
+    rejectTimeout = reject
+  })
+
+  const timer = setTimeout(() => {
+    didTimeout = true
+    controller?.abort()
+    rejectTimeout?.(new GitHubError(0, '请求超时'))
+  }, timeout)
+
   let response: Response
+  let raw: string
+
   try {
-    response = await fetch(`${API_BASE}${path}`, {
-      method: init.method ?? 'GET',
-      headers,
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-      signal:
-        init.signal ??
-        timeoutSignal(init.method === 'PUT' ? PUT_TIMEOUT : GET_TIMEOUT),
-      cache: 'no-store',
-    })
+    const result = await Promise.race([
+      (async () => {
+        const res = await fetch(`${API_BASE}${path}`, {
+          method: init.method ?? 'GET',
+          headers,
+          body: init.body === undefined ? undefined : JSON.stringify(init.body),
+          signal: init.signal ?? controller?.signal ?? timeoutSignal(timeout),
+          cache: 'no-store',
+        })
+        return { res, text: await res.text() }
+      })(),
+      timedOut,
+    ])
+    response = result.res
+    raw = result.text
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (
+      didTimeout ||
+      (error instanceof DOMException && error.name === 'AbortError')
+    ) {
       throw new GitHubError(0, '请求超时')
     }
     throw new GitHubError(0, error instanceof Error ? error.message : '网络请求失败')
+  } finally {
+    clearTimeout(timer)
   }
-
-  const raw = await response.text()
   let data: unknown = null
 
   if (raw) {
@@ -191,7 +220,7 @@ export async function putContent(
   }>(token, `${repoPath(owner, repo)}/contents/${encodePath(path)}`, {
     method: 'PUT',
     body: {
-      message: `Upload ${name} via PicX Mini`,
+      message: `Upload ${name} via PicX`,
       content,
       branch,
     },

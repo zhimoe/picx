@@ -1,13 +1,13 @@
 import type { Settings } from '../types'
 
-const STORAGE_KEY = 'picx-mini:settings:v1'
+const STORAGE_KEY = 'picx:settings:v1'
 
 export const DEFAULT_SETTINGS: Settings = {
   token: '',
-  owner: '',
-  repo: '',
-  branch: 'main',
-  dir: '',
+  owner: 'zhimoe',
+  repo: 'picx-images-hosting',
+  branch: 'master',
+  dir: 'pic',
   quality: 0.82,
   maxWidth: 0,
   randomSuffix: false,

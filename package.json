@@ -1,9 +1,9 @@
 {
-  "name": "picx-mini",
+  "name": "picx",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A minimal single-user GitHub image host for Cloudflare Workers.",
+  "description": "A compact single-user GitHub image host for Cloudflare Workers.",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=22.12"

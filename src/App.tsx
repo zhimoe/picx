@@ -52,7 +52,7 @@ export default function App() {
         <div class="brand">
           <span class="brand-mark">P</span>
           <div class="brand-text">
-            <strong>PicX Mini</strong>
+            <strong>PicX</strong>
             <span class="muted small">GitHub 图床 · 单人版</span>
           </div>
         </div>
@@ -109,7 +109,7 @@ export default function App() {
       </main>
 
       <footer class="footer muted small">
-        图片保存在你自己的 GitHub 仓库 · 基于 PicX v2 改造 · AGPL-3.0
+        图片保存在你自己的 GitHub 仓库 · AGPL-3.0
       </footer>
 
       <ToastHost />

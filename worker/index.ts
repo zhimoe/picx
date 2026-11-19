@@ -48,7 +48,7 @@ export default {
       return new Response('Unauthorized', {
         status: 401,
         headers: {
-          'WWW-Authenticate': 'Basic realm="PicX Mini", charset="UTF-8"',
+          'WWW-Authenticate': 'Basic realm="PicX", charset="UTF-8"',
           'Cache-Control': 'no-store',
           'Content-Type': 'text/plain; charset=utf-8',
         },
