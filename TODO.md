@@ -16,33 +16,48 @@
 
 待完成：
 
-- `BASIC_PASS` 尚未设置，Worker 目前返回 `500 Auth is not configured.`
-- 新子域的 HTTPS 证书可能需要几分钟生效
-- 正确密码登录后的线上验收
+- 在你自己的浏览器里登录并填入 GitHub Token（默认值已预填，只需填 Token）
+- 线上上传一张图片做最终确认（相同代码路径已在本地验证过）
 
-## 下一步：设置网页密码（必须）
+## 网页密码
 
-在项目根目录、自己的终端里运行：
+`BASIC_PASS` 已生成并设置。密码保存在本地私有文件：
+
+```text
+~/.config/picx/basic-pass
+```
+
+文件权限为 `600`。请把它保存到密码管理器，然后删除这个文件。如果要换成
+自己的密码，在项目根目录、自己的终端里运行：
 
 ```bash
 npx wrangler secret put BASIC_PASS
 ```
 
-输入长随机密码。不要用 Claude Code 的 `!`，隐藏输入可能被读成空值。
-设置后立即生效，不需要重新部署。
+不要用 Claude Code 的 `!`，隐藏输入可能被读成空值。
+
+已验证（HTTP）：
+
+- 无密码 → 401
+- 错误密码 → 401
+- 正确密码 → 200
+- 静态资源无密码 → 401；带密码 → 200
+- `WWW-Authenticate: Basic realm="PicX"`
+- `X-Content-Type-Options`、`Referrer-Policy`、`X-Frame-Options` 正常
 
 ## 线上验收清单
 
 - [x] Worker 部署到 Cloudflare
 - [x] 账号子域改为 `zhi-moe`
-- [ ] `BASIC_PASS` 设置
-- [ ] `https://picx.zhi-moe.workers.dev` 返回 401（无密码/错误密码）
-- [ ] 正确密码返回 200
-- [ ] 浏览器能进入上传页
-- [ ] 设置页默认值已填：`zhimoe/picx-images-hosting` @ `master` · `pic/`
-- [ ] 填入 GitHub Token，测试连接成功
-- [ ] 上传一张图片，生成 `.webp`、jsDelivr 链接和 Markdown
-- [ ] 图库能列出图片，搜索/批量复制正常
+- [x] `BASIC_PASS` 设置
+- [x] `https://picx.zhi-moe.workers.dev` 无密码/错误密码 → 401
+- [x] 正确密码 → 200（HTTP + HTTPS 均已验证）
+- [x] HTTPS 证书生效（TLS 1.3，证书校验通过）
+- [x] 浏览器能进入上传页
+- [x] 设置页默认值已填：`zhimoe/picx-images-hosting` @ `master` · `pic/`
+- [x] 图库能列出图片（30 张），搜索、批量复制、缩略图加载正常
+- [ ] 填入 GitHub Token，测试连接成功（你浏览器里操作）
+- [ ] 上传一张图片，生成 `.webp`、jsDelivr 链接和 Markdown（你浏览器里操作）
 
 ## 使用说明
 
