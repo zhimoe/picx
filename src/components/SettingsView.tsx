@@ -1,7 +1,9 @@
 import { Show, createEffect, createSignal } from 'solid-js'
 import type { Settings, TestConnectionResult } from '../types'
 import { describeGitHubError, testConnection } from '../lib/github'
-import { DEFAULT_SETTINGS } from '../lib/storage'
+import { isConfigured } from '../lib/storage'
+import Icon from './Icon'
+import { toast } from './Toast'
 
 interface Props {
   initial: Settings
@@ -22,6 +24,16 @@ export default function SettingsView(props: Props) {
   const [testing, setTesting] = createSignal(false)
   const [testResult, setTestResult] = createSignal<TestConnectionResult | null>(null)
   const [testError, setTestError] = createSignal('')
+  const [saveMessage, setSaveMessage] = createSignal('')
+  const [saveError, setSaveError] = createSignal('')
+  let testRequest = 0
+
+  const connectionValues = () => ({
+    token: token().trim(),
+    owner: owner().trim(),
+    repo: repo().trim(),
+    branch: branch().trim(),
+  })
 
   createEffect(() => {
     const settings = props.initial
@@ -35,250 +47,290 @@ export default function SettingsView(props: Props) {
     setRandomSuffix(settings.randomSuffix)
   })
 
+  createEffect(() => {
+    connectionValues()
+    testRequest += 1
+    setTestResult(null)
+    setTestError('')
+    setTesting(false)
+  })
+
+  createEffect(() => {
+    connectionValues()
+    dir()
+    quality()
+    maxWidth()
+    randomSuffix()
+    setSaveMessage('')
+    setSaveError('')
+  })
+
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
-    setTestError('')
     const next: Settings = {
-      token: token().trim(),
-      owner: owner().trim(),
-      repo: repo().trim(),
-      branch: branch().trim(),
+      ...connectionValues(),
       dir: dir().trim(),
       quality: quality(),
       maxWidth: maxWidth(),
       randomSuffix: randomSuffix(),
     }
 
-    if (!next.token || !next.owner || !next.repo || !next.branch) {
-      setTestError('请填写 Token、owner、repo 和 branch。')
+    if (!isConfigured(next)) {
+      setSaveError('请填写 GitHub Token、仓库所有者、仓库名称和分支。')
       return
     }
 
+    setSaveError('')
     props.onSave(next)
+    setSaveMessage('配置已保存')
   }
 
   const test = async () => {
-    const values = {
-      token: token().trim(),
-      owner: owner().trim(),
-      repo: repo().trim(),
-      branch: branch().trim(),
-    }
+    const values = connectionValues()
 
-    if (!values.token || !values.owner || !values.repo || !values.branch) {
-      setTestError('请先填写 Token、owner、repo 和 branch。')
+    if (!isConfigured({ ...props.initial, ...values })) {
+      setTestError('请填写 GitHub Token、仓库所有者、仓库名称和分支。')
       return
     }
 
+    const request = ++testRequest
     setTesting(true)
     setTestError('')
     setTestResult(null)
 
     try {
-      const result = await testConnection(
-        values.token,
-        values.owner,
-        values.repo,
-        values.branch,
-      )
-      setTestResult(result)
+      const result = await testConnection(values.token, values.owner, values.repo, values.branch)
+      if (request === testRequest) setTestResult(result)
     } catch (error) {
-      setTestError(describeGitHubError(error))
+      if (request === testRequest) setTestError(describeGitHubError(error))
     } finally {
-      setTesting(false)
+      if (request === testRequest) setTesting(false)
     }
   }
 
   return (
-    <section class="panel settings-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>连接 GitHub</h2>
-          <p class="muted">
-            配置只保存在当前浏览器。网页密码由 Cloudflare Worker 校验，和这里的 GitHub Token 是两回事。
-          </p>
-        </div>
-      </div>
-
-      <form class="settings-form" onSubmit={submit}>
-        <label class="field field-wide">
-          <span>GitHub Token</span>
-          <div class="input-row">
-            <input
-              type={showToken() ? 'text' : 'password'}
-              value={token()}
-              onInput={(event) => setToken(event.currentTarget.value)}
-              placeholder="ghp_... 或 github_pat_..."
-              autocomplete="new-password"
-              spellcheck={false}
-            />
-            <button
-              type="button"
-              class="button ghost"
-              onClick={() => setShowToken((value) => !value)}
-            >
-              {showToken() ? '隐藏' : '显示'}
-            </button>
-          </div>
-          <small class="hint">
-            公开仓库用 classic Token 的 <code>public_repo</code> 即可，私有仓库才需要{' '}
-            <code>repo</code>。更推荐 fine-grained Token，只授权目标仓库的 Contents 读写。
-            <a href="https://github.com/settings/tokens/new" target="_blank" rel="noreferrer">
-              生成 Token
-            </a>
-          </small>
-        </label>
-
-        <div class="field-grid">
-          <label class="field">
-            <span>Owner</span>
-            <input
-              value={owner()}
-              onInput={(event) => setOwner(event.currentTarget.value)}
-              placeholder="zhimoe"
-              autocomplete="off"
-              spellcheck={false}
-            />
-          </label>
-
-          <label class="field">
-            <span>仓库</span>
-            <input
-              value={repo()}
-              onInput={(event) => setRepo(event.currentTarget.value)}
-              placeholder="picx-images-hosting"
-              autocomplete="off"
-              spellcheck={false}
-            />
-          </label>
-
-          <label class="field">
-            <span>分支</span>
-            <input
-              value={branch()}
-              onInput={(event) => setBranch(event.currentTarget.value)}
-              placeholder="master"
-              autocomplete="off"
-              spellcheck={false}
-            />
-          </label>
-
-          <label class="field">
-            <span>上传目录</span>
-            <input
-              value={dir()}
-              onInput={(event) => setDir(event.currentTarget.value)}
-              placeholder="pic"
-              autocomplete="off"
-              spellcheck={false}
-            />
-            <small class="hint">
-              支持 <code>{'{yyyy}'}</code>、<code>{'{mm}'}</code>、<code>{'{dd}'}</code>；
-              留空表示仓库根目录。
-            </small>
-          </label>
-        </div>
-
-        <div class="field-grid">
-          <label class="field">
-            <span>WebP 质量：{quality().toFixed(2)}</span>
-            <input
-              type="range"
-              min="0.5"
-              max="1"
-              step="0.01"
-              value={quality()}
-              onInput={(event) => setQuality(Number(event.currentTarget.value))}
-            />
-            <small class="hint">默认 0.85；越低体积越小。</small>
-          </label>
-
-          <label class="field">
-            <span>最大宽度（px）</span>
-            <input
-              type="number"
-              min="0"
-              step="100"
-              value={maxWidth()}
-              onInput={(event) => setMaxWidth(Number(event.currentTarget.value) || 0)}
-            />
-            <small class="hint">0 表示保持原始尺寸；博客配图常用 1600～2000。</small>
-          </label>
-        </div>
-
-        <label class="check-row">
-          <input
-            type="checkbox"
-            checked={randomSuffix()}
-            onChange={(event) => setRandomSuffix(event.currentTarget.checked)}
-          />
-          <span>文件名添加随机后缀（减少 CDN 缓存和重名问题）</span>
-        </label>
-
-        <div class="form-actions">
-          <button type="submit" class="button primary">
-            保存配置
+    <section>
+      <header class="page-heading settings-heading">
+        <h1 tabindex="-1">设置</h1>
+        <p>连接 GitHub 仓库，管理每次上传使用的默认参数。</p>
+        <div class="settings-actions">
+          <button type="submit" form="settings-form" class="button primary">
+            {isConfigured(props.initial) ? '保存配置' : '保存并前往上传'}
+            <Show when={!isConfigured(props.initial)}><Icon name="arrow" size={17} /></Show>
           </button>
-          <button type="button" class="button" onClick={test} disabled={testing()}>
-            {testing() ? '测试中…' : '测试连接'}
-          </button>
-          <button
-            type="button"
-            class="button danger"
-            onClick={() => {
-              if (window.confirm('确定清除本地保存的 GitHub Token 和配置？')) {
-                props.onClear()
-              }
-            }}
-          >
-            清除本地配置
-          </button>
-          <a class="button ghost" href="https://github.com/new" target="_blank" rel="noreferrer">
-            新建仓库
-          </a>
+          <span class="save-message" role="status">{saveMessage()}</span>
         </div>
+        <Show when={saveError()}><p class="notice notice-error" role="alert">{saveError()}</p></Show>
+      </header>
 
-        <Show when={testError()}>
-          <p class="notice notice-error">{testError()}</p>
-        </Show>
-
-        <Show when={testResult()}>
-          {(result) => (
-            <div class="notice notice-success">
-              <p>
-                已连接 <strong>{result().user.login}</strong> ·{' '}
-                <strong>{result().repo.full_name}</strong> · 分支{' '}
-                <strong>{result().branch.name}</strong>
-              </p>
-              <Show when={result().repo.private}>
-                <p class="notice-warning">
-                  这是私有仓库：API 可以读写，但 jsDelivr 无法公开访问，生成的图片链接会 404。
-                </p>
-              </Show>
-              <Show when={result().repo.permissions?.push === false}>
-                <p class="notice-warning">
-                  Token 没有推送权限，上传会失败。请检查 Token 权限。
-                </p>
-              </Show>
-              <Show when={result().repo.default_branch !== branch()}>
-                <p class="notice-warning">
-                  仓库默认分支是 <code>{result().repo.default_branch}</code>，当前配置的是{' '}
-                  <code>{branch()}</code>。确认这是你想要的。
-                </p>
-              </Show>
+      <div class="workspace-grid settings-layout">
+        <form id="settings-form" class="panel-stack" onSubmit={submit}>
+          <section class="panel form-panel" aria-labelledby="connection-heading">
+            <div class="section-heading">
+              <span class="section-icon"><Icon name="repo" /></span>
+              <h2 id="connection-heading">GitHub 连接</h2>
             </div>
-          )}
-        </Show>
-      </form>
 
-      <p class="muted small">
-        图片仍保存在你自己的 GitHub 仓库。旧图片不会被修改；只要仓库、分支和路径不变，旧链接继续有效。
-      </p>
-      <p class="muted small">
-        当前默认值：{DEFAULT_SETTINGS.owner}/{DEFAULT_SETTINGS.repo} @{' '}
-        {DEFAULT_SETTINGS.branch} · 目录 <code>{DEFAULT_SETTINGS.dir || '/'}</code> · 质量{' '}
-        {DEFAULT_SETTINGS.quality}。
-      </p>
+            <div class="field">
+              <div class="field-title token-label">
+                <label for="github-token">GitHub Token</label>
+                <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
+                  创建 Token <Icon name="external" size={15} />
+                </a>
+              </div>
+              <div class="input-row">
+                <input
+                  id="github-token"
+                  type={showToken() ? 'text' : 'password'}
+                  value={token()}
+                  onInput={(event) => setToken(event.currentTarget.value)}
+                  placeholder="github_pat_… 或 ghp_…"
+                  autocomplete="new-password"
+                  spellcheck={false}
+                  aria-describedby="token-hint"
+                  required
+                />
+                <button type="button" class="button" onClick={() => setShowToken((value) => !value)}>
+                  {showToken() ? '隐藏' : '显示'}
+                </button>
+              </div>
+              <small id="token-hint" class="hint">Token 仅保存在此浏览器，用于访问 GitHub API。</small>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>仓库所有者</span>
+                <input
+                  value={owner()}
+                  onInput={(event) => setOwner(event.currentTarget.value)}
+                  autocomplete="off"
+                  spellcheck={false}
+                  required
+                />
+              </label>
+
+              <label class="field">
+                <span>仓库名称</span>
+                <input
+                  value={repo()}
+                  onInput={(event) => setRepo(event.currentTarget.value)}
+                  autocomplete="off"
+                  spellcheck={false}
+                  required
+                />
+              </label>
+
+              <label class="field">
+                <span>分支</span>
+                <input
+                  value={branch()}
+                  onInput={(event) => setBranch(event.currentTarget.value)}
+                  autocomplete="off"
+                  spellcheck={false}
+                  required
+                />
+              </label>
+
+              <label class="field">
+                <span>上传目录 <span class="hint">（选填）</span></span>
+                <input
+                  value={dir()}
+                  onInput={(event) => setDir(event.currentTarget.value)}
+                  placeholder="仓库根目录"
+                  autocomplete="off"
+                  spellcheck={false}
+                  aria-describedby="dir-hint"
+                />
+                <small id="dir-hint" class="hint">留空上传到根目录，支持 <code>pic/{'{yyyy}'}/{'{mm}'}/{'{dd}'}</code>。</small>
+              </label>
+            </div>
+
+            <div class="form-actions connection-actions">
+              <button type="button" class="button" onClick={test} disabled={testing()}>
+                <Icon name="refresh" size={16} />
+                {testing() ? '测试中…' : '测试连接'}
+              </button>
+            </div>
+
+            <Show when={testError()}>
+              <p class="notice notice-error" role="alert">{testError()}</p>
+            </Show>
+
+            <Show when={testResult()}>
+              {(result) => (
+                <div class="connection-result" role="status">
+                  <p class="notice notice-success">
+                    <Icon name="check" size={17} />
+                    <span>
+                      已连接 <strong>{result().repo.full_name}</strong> · {result().branch.name}
+                      <br />当前账号 {result().user.login}
+                    </span>
+                  </p>
+                  <Show when={result().repo.private}>
+                    <p class="notice notice-warning">这是私有仓库，生成的 jsDelivr 链接无法公开访问。</p>
+                  </Show>
+                  <Show when={result().repo.permissions?.push === false}>
+                    <p class="notice notice-warning">当前 Token 缺少推送权限，请检查仓库授权。</p>
+                  </Show>
+                  <Show when={result().repo.default_branch !== branch().trim()}>
+                    <p class="notice notice-warning">
+                      默认分支为 <code>{result().repo.default_branch}</code>，当前选择 <code>{result().branch.name}</code>。
+                    </p>
+                  </Show>
+                </div>
+              )}
+            </Show>
+          </section>
+
+          <section class="panel form-panel" aria-labelledby="defaults-heading">
+            <div class="section-heading">
+              <span class="section-icon"><Icon name="settings" /></span>
+              <h2 id="defaults-heading">上传默认值</h2>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span class="field-title">WebP 质量 <strong>{quality().toFixed(2)}</strong></span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="1"
+                  step="0.01"
+                  value={quality()}
+                  onInput={(event) => setQuality(Number(event.currentTarget.value))}
+                  aria-describedby="default-quality-hint"
+                />
+                <small id="default-quality-hint" class="hint">值越低，文件体积通常越小。</small>
+              </label>
+
+              <label class="field">
+                <span>最大宽度（px）</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={maxWidth()}
+                  onInput={(event) => setMaxWidth(Number(event.currentTarget.value) || 0)}
+                  aria-describedby="default-width-hint"
+                />
+                <small id="default-width-hint" class="hint">填 0 保留图片原始尺寸。</small>
+              </label>
+            </div>
+
+            <label class="check-row">
+              <input
+                type="checkbox"
+                checked={randomSuffix()}
+                onChange={(event) => setRandomSuffix(event.currentTarget.checked)}
+              />
+              <span>文件名添加随机后缀 <small class="hint">减少重名和 CDN 缓存问题</small></span>
+            </label>
+          </section>
+        </form>
+
+        <aside class="panel-stack">
+          <section class="panel context-panel" aria-labelledby="guide-heading">
+            <div class="section-heading">
+              <span class="section-icon"><Icon name="info" /></span>
+              <h2 id="guide-heading">配置指南</h2>
+            </div>
+            <div class="guide-item">
+              <h3>选择公开仓库</h3>
+              <p>jsDelivr 通过公开仓库提供图片链接。</p>
+              <a href="https://github.com/new" target="_blank" rel="noreferrer">
+                新建仓库 <Icon name="external" size={15} />
+              </a>
+            </div>
+            <div class="guide-item">
+              <h3>授予 Token 权限</h3>
+              <p>细粒度 Token 仅授权目标仓库的 Contents 读写。公开仓库也可以使用带 <code>public_repo</code> 的经典 Token。</p>
+            </div>
+          </section>
+
+          <Show when={isConfigured(props.initial)}>
+            <section class="panel context-panel" aria-labelledby="local-heading">
+              <div class="section-heading">
+                <span class="section-icon"><Icon name="shield" /></span>
+                <h2 id="local-heading">本地配置</h2>
+              </div>
+              <p>清除后需要重新填写 Token 和仓库信息。已上传的图片仍保留在 GitHub。</p>
+              <button
+                type="button"
+                class="button danger"
+                onClick={() => {
+                  if (window.confirm('确定清除此浏览器保存的 GitHub Token 和配置？')) {
+                    setShowToken(false)
+                    props.onClear()
+                    toast('已清除本地配置', 'info')
+                  }
+                }}
+              >
+                <Icon name="trash" size={16} />清除本地配置
+              </button>
+            </section>
+          </Show>
+        </aside>
+      </div>
     </section>
   )
 }

@@ -8,6 +8,7 @@ import {
 } from 'solid-js'
 import type { Settings, UploadItem, UploadStatus } from '../types'
 import { copyText } from '../lib/copy'
+import { isConfigured } from '../lib/storage'
 import {
   describeGitHubError,
   isConflictError,
@@ -36,10 +37,12 @@ import {
 } from '../lib/links'
 import { toast } from './Toast'
 import { CopyButton } from './CopyButton'
+import Icon from './Icon'
 
 interface Props {
   settings: Settings
   active: boolean
+  onSettings: () => void
   onUploaded: () => void
 }
 
@@ -70,14 +73,34 @@ export default function UploadView(props: Props) {
   const [quality, setQuality] = createSignal(props.settings.quality)
   const [maxWidth, setMaxWidth] = createSignal(props.settings.maxWidth)
   const [dragDepth, setDragDepth] = createSignal(0)
+  const [fileErrors, setFileErrors] = createSignal<string[]>([])
   let fileInput: HTMLInputElement | undefined
 
   const dragging = () => dragDepth() > 0
+  const configured = () => isConfigured(props.settings)
   const targetDir = createMemo(() => resolveDir(props.settings.dir))
-  const pendingCount = createMemo(
-    () => items().filter((item) => item.status === 'queued' || item.status === 'error').length,
-  )
+  const queueCounts = createMemo(() => {
+    const counts: Record<UploadStatus, number> = {
+      queued: 0,
+      converting: 0,
+      uploading: 0,
+      done: 0,
+      error: 0,
+    }
+    for (const item of items()) counts[item.status] += 1
+    return counts
+  })
+  const pendingCount = () => queueCounts().queued + queueCounts().error
   const doneItems = createMemo(() => items().filter((item) => item.status === 'done'))
+  const queueAnnouncement = () => {
+    const counts = queueCounts()
+    const statuses: UploadStatus[] = ['queued', 'converting', 'uploading', 'done', 'error']
+    const summary = statuses
+      .filter((status) => counts[status] > 0)
+      .map((status) => `${statusText(status)} ${counts[status]} 张`)
+      .join('，')
+    return summary ? `上传队列：${summary}` : '上传队列为空'
+  }
 
   createEffect(() => {
     setQuality(props.settings.quality)
@@ -94,13 +117,14 @@ export default function UploadView(props: Props) {
     if (!files.length) return
 
     const accepted: UploadItem[] = []
+    const errors: string[] = []
     for (const file of files) {
       if (!isImageFile(file)) {
-        toast(`${file.name} 不是图片，已跳过`, 'error')
+        errors.push(`${file.name} 不是图片，已跳过。`)
         continue
       }
       if (file.size > INPUT_LIMIT) {
-        toast(`${file.name} 超过 30MB，已跳过`, 'error')
+        errors.push(`${file.name} 超过 30 MB，已跳过。`)
         continue
       }
 
@@ -113,6 +137,7 @@ export default function UploadView(props: Props) {
       })
     }
 
+    setFileErrors(errors)
     if (accepted.length) setItems((list) => [...list, ...accepted])
   }
 
@@ -260,12 +285,7 @@ export default function UploadView(props: Props) {
   const uploadAll = async () => {
     if (uploading()) return
 
-    if (
-      !props.settings.token ||
-      !props.settings.owner ||
-      !props.settings.repo ||
-      !props.settings.branch
-    ) {
+    if (!configured()) {
       toast('请先在设置中完成 GitHub 配置', 'error')
       return
     }
@@ -356,175 +376,226 @@ export default function UploadView(props: Props) {
   }
 
   return (
-    <section class="panel upload-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>上传图片</h2>
-          <p class="muted">
-            目标：<strong>{props.settings.owner}/{props.settings.repo}</strong> @{' '}
-            <strong>{props.settings.branch}</strong> ·{' '}
-            {targetDir() ? <code>{targetDir()}/</code> : '仓库根目录'}
-          </p>
-        </div>
-        <Show when={doneItems().length > 0}>
-          <button type="button" class="button" onClick={copyAllDone}>
-            复制全部 Markdown
-          </button>
-        </Show>
-      </div>
+    <section>
+      <header class="page-heading">
+        <h1 tabindex="-1">上传图片</h1>
+        <p>将图片上传到 GitHub，获取可直接使用的链接和 Markdown。</p>
+      </header>
 
-      <div class="upload-controls">
-        <label>
-          <span>WebP 质量：{quality().toFixed(2)}</span>
+      <div class="workspace-grid upload-layout">
+        <section class="panel upload-panel" aria-label="选择图片">
           <input
-            type="range"
-            min="0.5"
-            max="1"
-            step="0.01"
-            value={quality()}
-            disabled={uploading()}
-            onInput={(event) => setQuality(Number(event.currentTarget.value))}
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(event) => {
+              addFiles(Array.from(event.currentTarget.files ?? []))
+              event.currentTarget.value = ''
+            }}
           />
-        </label>
-        <label>
-          <span>最大宽度</span>
-          <input
-            type="number"
-            min="0"
-            step="100"
-            value={maxWidth()}
-            disabled={uploading()}
-            onInput={(event) => setMaxWidth(Number(event.currentTarget.value) || 0)}
-          />
-        </label>
-        <span class="muted small">
-          0 = 原尺寸。设置页里的值作为默认值，这里只影响本次上传。
-        </span>
-      </div>
-
-      <label
-        class="dropzone"
-        classList={{ dragging: dragging() }}
-        role="button"
-        tabindex="0"
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            fileInput?.click()
-          }
-        }}
-        onDragEnter={(event) => {
-          event.preventDefault()
-          setDragDepth((depth) => depth + 1)
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onDragLeave={(event) => {
-          event.preventDefault()
-          setDragDepth((depth) => Math.max(0, depth - 1))
-        }}
-        onDrop={onDrop}
-      >
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={(event) => {
-            addFiles(Array.from(event.currentTarget.files ?? []))
-            event.currentTarget.value = ''
-          }}
-        />
-        <span class="dropzone-icon">＋</span>
-        <span class="dropzone-title">拖拽图片到这里，或点击选择</span>
-        <span class="muted small">
-          也可以直接 Ctrl/⌘ + V 粘贴截图。支持 JPG / PNG / WebP / AVIF / GIF / SVG，单张 ≤ 30MB。
-        </span>
-      </label>
-
-      <Show when={items().length > 0}>
-        <div class="upload-actions">
           <button
             type="button"
-            class="button primary"
-            disabled={uploading() || pendingCount() === 0}
-            onClick={uploadAll}
+            class="dropzone"
+            classList={{ dragging: dragging() }}
+            aria-label="选择图片"
+            aria-describedby="dropzone-hint"
+            onClick={() => fileInput?.click()}
+            onDragEnter={(event) => {
+              event.preventDefault()
+              setDragDepth((depth) => depth + 1)
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={(event) => {
+              event.preventDefault()
+              setDragDepth((depth) => Math.max(0, depth - 1))
+            }}
+            onDrop={onDrop}
           >
-            {uploading() ? '上传中…' : `上传全部（${pendingCount()}）`}
+            <span class="drop-art" aria-hidden="true">
+              <span class="drop-art-back" />
+              <span class="drop-art-front"><Icon name="images" size={36} /></span>
+              <span class="drop-art-action"><Icon name="upload" size={17} /></span>
+            </span>
+            <span class="dropzone-title">{dragging() ? '松开鼠标添加图片' : '拖拽图片到这里'}</span>
+            <span class="button primary dropzone-action">选择图片</span>
+            <span id="dropzone-hint" class="dropzone-hint">
+              也可以按 <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>V</kbd> 粘贴截图
+            </span>
           </button>
-          <button
-            type="button"
-            class="button"
-            disabled={uploading() || doneItems().length === 0}
-            onClick={clearDone}
-          >
-            清除已完成
-          </button>
-          <button type="button" class="button danger" disabled={uploading()} onClick={clearItems}>
-            清空列表
-          </button>
-        </div>
 
-        <div class="upload-list">
-          <For each={items()}>
-            {(item) => (
-              <article class="upload-item" classList={{ done: item.status === 'done', failed: item.status === 'error' }}>
-                <img class="thumb" src={item.previewUrl} alt="" />
-                <div class="item-main">
-                  <div class="item-title">
-                    <strong title={item.file.name}>{item.file.name}</strong>
-                    <span class={`badge badge-${item.status}`}>{statusText(item.status)}</span>
-                  </div>
-                  <div class="item-meta">
-                    {formatBytes(item.file.size)}
-                    <Show when={item.outputSize !== undefined}>
-                      {' → '}
-                      {formatBytes(item.outputSize ?? 0)}
-                    </Show>
-                    <Show when={item.width && item.height}>
-                      {' · '}
-                      {item.width}×{item.height}
-                    </Show>
-                    <Show when={item.note}>
-                      {' · '}
-                      {item.note}
-                    </Show>
-                  </div>
-                  <Show when={item.error}>
-                    <p class="error-text">{item.error}</p>
+          <div class="dropzone-meta">
+            <span>JPG、PNG、WebP、AVIF、GIF、SVG 等</span>
+            <span>单张最多 30 MB</span>
+          </div>
+          <Show when={fileErrors().length > 0}>
+            <ul class="notice notice-error file-errors" role="alert">
+              <For each={fileErrors()}>{(error) => <li>{error}</li>}</For>
+            </ul>
+          </Show>
+        </section>
+
+        <aside class="panel-stack upload-context">
+          <section class="panel context-panel" aria-labelledby="target-heading">
+            <div class="section-heading">
+              <span class="section-icon"><Icon name="repo" /></span>
+              <h2 id="target-heading">上传目标</h2>
+            </div>
+            <Show
+              when={configured()}
+              fallback={
+                <p>配置 GitHub 仓库和 Token 后，即可上传队列中的图片。</p>
+              }
+            >
+              <strong class="target-repo">{props.settings.owner}/{props.settings.repo}</strong>
+              <div class="target-meta">
+                <span title="分支"><Icon name="branch" size={15} />{props.settings.branch}</span>
+                <span title="目录"><Icon name="folder" size={15} />{targetDir() ? `${targetDir()}/` : '仓库根目录'}</span>
+              </div>
+            </Show>
+            <button type="button" class="text-button" onClick={props.onSettings}>
+              {configured() ? '修改配置' : '前往设置'} <Icon name="arrow" size={15} />
+            </button>
+          </section>
+
+          <section class="panel context-panel upload-parameters" aria-labelledby="parameters-heading">
+            <div class="section-heading">
+              <span class="section-icon"><Icon name="settings" /></span>
+              <h2 id="parameters-heading">本次上传参数</h2>
+            </div>
+            <label class="field">
+              <span class="field-title">WebP 质量 <strong>{quality().toFixed(2)}</strong></span>
+              <input
+                type="range"
+                min="0.5"
+                max="1"
+                step="0.01"
+                value={quality()}
+                disabled={uploading()}
+                onInput={(event) => setQuality(Number(event.currentTarget.value))}
+              />
+            </label>
+            <label class="field">
+              <span>最大宽度（px）</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={maxWidth()}
+                disabled={uploading()}
+                onInput={(event) => setMaxWidth(Math.max(0, Math.round(Number(event.currentTarget.value) || 0)))}
+                aria-describedby="upload-width-hint"
+              />
+              <small id="upload-width-hint" class="hint">填 0 保留原始尺寸。</small>
+            </label>
+          </section>
+        </aside>
+
+        <section class="panel queue-panel" aria-labelledby="queue-heading">
+          <div class="sr-only" role="status">{queueAnnouncement()}</div>
+          <div class="queue-heading">
+            <div class="section-heading">
+              <span class="section-icon"><Icon name="inbox" /></span>
+              <h2 id="queue-heading">上传队列</h2>
+              <Show when={items().length > 0}>
+                <span class="queue-count">{items().length} 张</span>
+              </Show>
+            </div>
+            <Show when={items().length > 0}>
+              <div class="queue-controls">
+                <div class="queue-tools">
+                  <Show when={doneItems().length > 0}>
+                    <button type="button" class="button small" onClick={copyAllDone}>
+                      <Icon name="copy" size={15} />复制全部 Markdown
+                    </button>
+                    <button type="button" class="button small ghost" disabled={uploading()} onClick={clearDone}>
+                      清除已完成
+                    </button>
                   </Show>
-                  <Show when={item.markdown}>
-                    <div class="result">
-                      <code>{item.markdown}</code>
-                      <div class="result-actions">
-                        <CopyButton text={item.markdown ?? ''} label="复制 Markdown" />
-                        <CopyButton text={item.url ?? ''} label="复制 URL" />
-                        <button
-                          type="button"
-                          class="button small ghost"
-                          onClick={() => purgeImage(item)}
-                        >
-                          刷新 CDN
-                        </button>
-                      </div>
-                    </div>
-                  </Show>
+                  <button type="button" class="button small ghost danger" disabled={uploading()} onClick={clearItems}>
+                    <Icon name="trash" size={15} />清空队列
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  class="icon-button"
-                  title="移除"
-                  aria-label="移除"
-                  disabled={item.status === 'uploading' || item.status === 'converting'}
-                  onClick={() => removeItem(item.id)}
-                >
-                  ×
-                </button>
-              </article>
-            )}
-          </For>
-        </div>
-      </Show>
+                <div class="queue-submit">
+                  <Show when={!configured()}>
+                    <button type="button" class="text-button" onClick={props.onSettings}>
+                      配置仓库后可上传 <Icon name="arrow" size={15} />
+                    </button>
+                  </Show>
+                  <button
+                    type="button"
+                    class="button primary"
+                    disabled={!configured() || uploading() || pendingCount() === 0}
+                    onClick={uploadAll}
+                  >
+                    <Icon name="upload" size={17} />
+                    {uploading() ? '上传中…' : pendingCount() ? `开始上传（${pendingCount()}）` : '已全部上传'}
+                  </button>
+                </div>
+              </div>
+            </Show>
+          </div>
+
+          <Show when={items().length > 0} fallback={<p class="queue-empty">队列为空，添加图片后即可批量上传。</p>}>
+            <div class="upload-list">
+              <For each={items()}>
+                {(item) => (
+                  <article class="upload-item" classList={{ done: item.status === 'done', failed: item.status === 'error' }}>
+                    <img class="thumb" src={item.previewUrl} alt="" />
+                    <div class="item-main">
+                      <div class="item-title">
+                        <strong title={item.file.name}>{item.file.name}</strong>
+                        <span class={`badge badge-${item.status}`}>{statusText(item.status)}</span>
+                      </div>
+                      <div class="item-meta">
+                        {formatBytes(item.file.size)}
+                        <Show when={item.outputSize !== undefined}>
+                          {' → '}
+                          {formatBytes(item.outputSize ?? 0)}
+                        </Show>
+                        <Show when={item.width && item.height}>
+                          {' · '}
+                          {item.width}×{item.height}
+                        </Show>
+                        <Show when={item.note}>
+                          {' · '}
+                          {item.note}
+                        </Show>
+                      </div>
+                      <Show when={item.error}>
+                        <p class="error-text">{item.error}</p>
+                      </Show>
+                      <Show when={item.markdown}>
+                        <div class="result">
+                          <code>{item.markdown}</code>
+                          <div class="result-actions">
+                            <CopyButton text={item.markdown ?? ''} label="复制 Markdown" />
+                            <CopyButton text={item.url ?? ''} label="复制 URL" />
+                            <button type="button" class="button small ghost" onClick={() => purgeImage(item)}>
+                              刷新 CDN
+                            </button>
+                          </div>
+                        </div>
+                      </Show>
+                    </div>
+                    <button
+                      type="button"
+                      class="button icon-button ghost danger"
+                      title="移除"
+                      aria-label={`移除 ${item.file.name}`}
+                      disabled={item.status === 'uploading' || item.status === 'converting'}
+                      onClick={() => removeItem(item.id)}
+                    >
+                      <Icon name="close" size={17} />
+                    </button>
+                  </article>
+                )}
+              </For>
+            </div>
+          </Show>
+        </section>
+      </div>
     </section>
   )
 }

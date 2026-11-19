@@ -1,4 +1,5 @@
 import { For, createSignal } from 'solid-js'
+import Icon from './Icon'
 
 export type ToastKind = 'info' | 'success' | 'error'
 
@@ -34,7 +35,9 @@ export function ToastHost() {
             title="点击关闭"
             onClick={() => dismiss(item.id)}
           >
-            {item.message}
+            <Icon name={item.kind === 'success' ? 'check' : 'info'} size={18} />
+            <span>{item.message}</span>
+            <Icon name="close" size={15} />
           </button>
         )}
       </For>

@@ -1,4 +1,4 @@
-import { Show, createSignal } from 'solid-js'
+import { For, createEffect, createSignal, onCleanup } from 'solid-js'
 import type { Settings } from './types'
 import {
   DEFAULT_SETTINGS,
@@ -7,110 +7,174 @@ import {
   loadSettings,
   saveSettings,
 } from './lib/storage'
+import { isTheme, loadTheme, saveTheme, themes, type Theme } from './lib/theme'
 import GalleryView from './components/GalleryView'
+import Icon, { type IconName } from './components/Icon'
 import SettingsView from './components/SettingsView'
 import UploadView from './components/UploadView'
 import { ToastHost, toast } from './components/Toast'
 
 type Tab = 'upload' | 'gallery' | 'settings'
 
-export default function App() {
-  const [settings, setSettings] = createSignal(loadSettings())
-  const [tab, setTab] = createSignal<Tab>(
-    isConfigured(settings()) ? 'upload' : 'settings',
-  )
-  const [galleryVersion, setGalleryVersion] = createSignal(0)
+const navigation: { tab: Tab; label: string; icon: IconName }[] = [
+  { tab: 'upload', label: '上传', icon: 'upload' },
+  { tab: 'gallery', label: '图库', icon: 'images' },
+  { tab: 'settings', label: '设置', icon: 'settings' },
+]
 
+const themeLabels: Record<Theme, string> = {
+  light: '新版浅色',
+  dark: '新版深色',
+  terracotta: '原陶土红',
+}
+
+const themeIcons: Record<Theme, string> = {
+  light: '/favicon-light.svg',
+  dark: '/favicon-dark.svg',
+  terracotta: '/favicon.svg',
+}
+
+export default function App() {
+  const systemScheme = window.matchMedia('(prefers-color-scheme: dark)')
+  const [systemDark, setSystemDark] = createSignal(systemScheme.matches)
+  const [preferredTheme, setPreferredTheme] = createSignal(loadTheme())
+  const theme = () => preferredTheme() ?? (systemDark() ? 'dark' : 'light')
+  const followSystem = (event: MediaQueryListEvent) => setSystemDark(event.matches)
+  systemScheme.addEventListener('change', followSystem)
+  onCleanup(() => systemScheme.removeEventListener('change', followSystem))
+
+  createEffect(() => {
+    // The original terracotta theme keeps both of its system color schemes.
+    systemDark()
+    const active = theme()
+    const root = document.documentElement
+    root.dataset.theme = active
+    const background = getComputedStyle(root).getPropertyValue('--bg').trim()
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', background)
+    document.querySelector('link[rel="icon"]')?.setAttribute('href', themeIcons[active])
+  })
+
+  const [settings, setSettings] = createSignal(loadSettings())
   const configured = () => isConfigured(settings())
+  const repository = () => `${settings().owner}/${settings().repo}`
+  const [tab, setTab] = createSignal<Tab>(configured() ? 'upload' : 'settings')
+  const [galleryOpened, setGalleryOpened] = createSignal(false)
+  const [galleryVersion, setGalleryVersion] = createSignal(0)
+  let main: HTMLElement | undefined
+
+  const selectTab = (next: Tab) => {
+    if (tab() === next) return
+    if (next === 'gallery') setGalleryOpened(true)
+    setTab(next)
+    window.scrollTo(0, 0)
+    main?.querySelector<HTMLElement>('.view:not([hidden]) h1')?.focus({ preventScroll: true })
+  }
 
   const onSave = (next: Settings) => {
-    const normalized = saveSettings(next)
-    setSettings(normalized)
-    toast('配置已保存', 'success')
-    if (isConfigured(normalized)) setTab('upload')
+    const firstSave = !configured()
+    setSettings(saveSettings(next))
+    if (firstSave) {
+      selectTab('upload')
+      toast('配置已保存', 'success')
+    }
   }
 
   const onClear = () => {
     clearSettings()
     setSettings({ ...DEFAULT_SETTINGS })
-    setTab('settings')
-    toast('已清除本地配置', 'info')
-  }
-
-  const selectTab = (next: Tab) => {
-    if (next !== 'settings' && !configured()) {
-      toast('请先完成 GitHub 设置', 'error')
-      setTab('settings')
-      return
-    }
-    setTab(next)
   }
 
   return (
-    <div class="app-shell">
-      <header class="topbar">
+    <div class="app-shell" classList={{ 'settings-open': tab() === 'settings' }}>
+      <aside class="sidebar">
         <div class="brand">
-          <span class="brand-mark">P</span>
+          <img src={themeIcons[theme()]} class="brand-mark" alt="" />
           <div class="brand-text">
             <strong>PicX</strong>
-            <span class="muted small">GitHub 图床 · 单人版</span>
+            <span>GitHub 图床</span>
           </div>
         </div>
 
-        <nav class="tabs" aria-label="主导航">
-          <button
-            type="button"
-            classList={{ active: tab() === 'upload' }}
-            onClick={() => selectTab('upload')}
-          >
-            上传
-          </button>
-          <button
-            type="button"
-            classList={{ active: tab() === 'gallery' }}
-            onClick={() => selectTab('gallery')}
-          >
-            图库
-          </button>
-          <button
-            type="button"
-            classList={{ active: tab() === 'settings' }}
-            onClick={() => selectTab('settings')}
-          >
-            设置
-          </button>
+        <nav class="navigation" aria-label="主导航">
+          <For each={navigation}>
+            {(item) => (
+              <button
+                type="button"
+                aria-current={tab() === item.tab ? 'page' : undefined}
+                onClick={() => selectTab(item.tab)}
+              >
+                <Icon name={item.icon} />
+                {item.label}
+              </button>
+            )}
+          </For>
         </nav>
 
-        <div class="topbar-meta">
-          <Show when={configured()}>
-            <span class="muted small">
-              {settings().owner}/{settings().repo} @ {settings().branch}
+        <div class="sidebar-foot">
+          <button
+            type="button"
+            class="workspace-status"
+            aria-label={configured() ? `仓库设置，当前仓库 ${repository()}` : '仓库设置，尚未配置'}
+            title={configured() ? repository() : '设置 GitHub Token'}
+            onClick={() => selectTab('settings')}
+          >
+            <span class="workspace-icon"><Icon name="repo" size={17} /></span>
+            <span class="workspace-text" aria-hidden="true">
+              {configured() ? settings().repo : '未配置仓库'}
             </span>
-          </Show>
+            <span class="workspace-label-mobile" aria-hidden="true">
+              {configured() ? '仓库' : '未配置'}
+            </span>
+          </button>
+          <div class="theme-picker">
+            <Icon name="appearance" size={17} />
+            <select
+              aria-label="外观主题"
+              onChange={(event) => {
+                const next = event.currentTarget.value
+                if (!isTheme(next)) return
+                setPreferredTheme(next)
+                saveTheme(next)
+              }}
+            >
+              <For each={themes}>
+                {(option) => <option value={option} selected={theme() === option}>{themeLabels[option]}</option>}
+              </For>
+            </select>
+            <Icon name="chevron" size={15} />
+          </div>
         </div>
-      </header>
+      </aside>
 
-      <main class="main">
-        <div class="view" classList={{ active: tab() === 'upload' }}>
+      <main class="main" ref={main}>
+        <div class="view" hidden={tab() !== 'upload'}>
           <UploadView
             settings={settings()}
             active={tab() === 'upload'}
+            onSettings={() => selectTab('settings')}
             onUploaded={() => setGalleryVersion((value) => value + 1)}
           />
         </div>
 
-        <div class="view" classList={{ active: tab() === 'gallery' }}>
-          <GalleryView settings={settings()} version={galleryVersion()} />
+        <div class="view" hidden={tab() !== 'gallery'}>
+          <GalleryView
+            settings={settings()}
+            enabled={galleryOpened()}
+            version={galleryVersion()}
+            onSettings={() => selectTab('settings')}
+            onUpload={() => selectTab('upload')}
+          />
         </div>
 
-        <div class="view" classList={{ active: tab() === 'settings' }}>
+        <div class="view" hidden={tab() !== 'settings'}>
           <SettingsView initial={settings()} onSave={onSave} onClear={onClear} />
         </div>
-      </main>
 
-      <footer class="footer muted small">
-        图片保存在你自己的 GitHub 仓库 · AGPL-3.0
-      </footer>
+        <footer class="footer">
+          <span>图片存储于你的 GitHub 仓库</span>
+          <span>AGPL-3.0</span>
+        </footer>
+      </main>
 
       <ToastHost />
     </div>
