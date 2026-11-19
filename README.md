@@ -52,7 +52,7 @@ npm install
 npm run dev
 ```
 
-打开 http://localhost:5173。Vite 开发服务器没有密码，不要暴露到公网。
+打开 http://localhost:5173, Vite 开发服务器没有密码，不要暴露到公网。
 
 要测试真实的 Worker + Basic Auth：
 
@@ -62,7 +62,7 @@ cp .dev.vars.example .dev.vars
 npm run worker:dev
 ```
 
-打开 http://localhost:8787，用 `.dev.vars` 里的用户名/密码登录。
+打开 http://localhost:8787, 用 `.dev.vars` 里的用户名/密码登录。
 
 常用命令：
 
