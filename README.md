@@ -39,7 +39,7 @@ https://picx.zhi-moe.workers.dev
 | 仓库 | `picx-images-hosting` |
 | 分支 | `master` |
 | 上传目录 | `pic` |
-| WebP 质量 | `0.82` |
+| WebP 质量 | `0.85` |
 | 最大宽度 | `0`（保持原尺寸） |
 | 随机文件名后缀 | 关闭 |
 

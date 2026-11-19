@@ -5,7 +5,7 @@
 已完成：
 
 - 品牌统一为 PicX：页面标题、Worker 名、包名、README、默认配置
-- 默认值：`zhimoe/picx-images-hosting` @ `master` · `pic/`；质量 0.82；最大宽度 0
+- 默认值：`zhimoe/picx-images-hosting` @ `master` · `pic/`；质量 0.85；最大宽度 0
 - 代码仓库：https://github.com/zhimoe/picx
 - Worker：`picx`；账号子域：`zhi-moe`
 - 公开地址：https://picx.zhi-moe.workers.dev

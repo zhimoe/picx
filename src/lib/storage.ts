@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: Settings = {
   repo: 'picx-images-hosting',
   branch: 'master',
   dir: 'pic',
-  quality: 0.82,
+  quality: 0.85,
   maxWidth: 0,
   randomSuffix: false,
 }

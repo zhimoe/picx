@@ -190,7 +190,7 @@ export default function SettingsView(props: Props) {
               value={quality()}
               onInput={(event) => setQuality(Number(event.currentTarget.value))}
             />
-            <small class="hint">默认 0.82；越低体积越小。</small>
+            <small class="hint">默认 0.85；越低体积越小。</small>
           </label>
 
           <label class="field">
