@@ -7,6 +7,12 @@ Basic Auth 保护，不需要数据库，也不需要服务端保存 GitHub Toke
 > 本项目参考 [PicX v2](https://github.com/XPoet/picx/tree/v2) 的行为重新实现，
 > 不是 PicX 官方项目，与原作者无隶属关系。
 
+## 截图
+
+![PicX 上传页面](screenshots/picx-worker.png)
+
+上传页：拖拽、选择或粘贴图片，右侧可调整 WebP 质量与最大宽度。
+
 ## 当前部署
 
 https://picx.zhi-moe.workers.dev
